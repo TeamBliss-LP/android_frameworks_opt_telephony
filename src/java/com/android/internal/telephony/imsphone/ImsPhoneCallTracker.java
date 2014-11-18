@@ -1201,14 +1201,6 @@ public final class ImsPhoneCallTracker extends CallTracker {
             }
 
             processCallStateChange(imsCall, ImsPhoneCall.State.DISCONNECTED, cause);
-
-            if (reasonInfo.getCode() == ImsReasonInfo.CODE_USER_TERMINATED) {
-                if ((oldState == ImsPhoneCall.State.DISCONNECTING)
-                        && (mForegroundCall.getState() == ImsPhoneCall.State.IDLE)
-                        && (mBackgroundCall.getState() == ImsPhoneCall.State.HOLDING)) {
-                    sendEmptyMessage(EVENT_RESUME_BACKGROUND);
-                }
-            }
             if (mForegroundCall.getState() != ImsPhoneCall.State.ACTIVE) {
                 if (mRingingCall.getState().isRinging()) {
                     // Drop pending MO. We should address incoming call first
