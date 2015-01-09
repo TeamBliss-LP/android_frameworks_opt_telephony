@@ -87,7 +87,7 @@ import java.util.Set;
  */
 public class SubscriptionController extends ISub.Stub {
     static final String LOG_TAG = "SubscriptionController";
-    static final boolean DBG = true;
+    static final boolean DBG = false;
     static final boolean VDBG = false;
     static final int MAX_LOCAL_LOG_LINES = 500; // TODO: Reduce to 100 when 17678050 is fixed
     private ScLocalLog mLocalLog = new ScLocalLog(MAX_LOCAL_LOG_LINES);
@@ -1019,6 +1019,15 @@ public class SubscriptionController extends ISub.Stub {
                 SubscriptionManager.UNIQUE_KEY_SUBSCRIPTION_ID
                     + "=" + Long.toString(subId), null);
         if (DBG) logd("[setDisplayNumber]- update result :" + result);
+
+        // This function had a call to update number on the SIM (Phone.setLine1Number()) but that
+        // was removed as there doesn't seem to be a reason for that. If it is added back, watch out
+        // for deadlocks.
+
+        result = mContext.getContentResolver().update(SubscriptionManager.CONTENT_URI, value,
+                SubscriptionManager.UNIQUE_KEY_SUBSCRIPTION_ID
+                    + "=" + Long.toString(subId), null);
+        if (DBG) logd("[setDisplayNumber]- number: " + number + " update result :" + result);
         notifySubscriptionInfoChanged();
 
         return result;
