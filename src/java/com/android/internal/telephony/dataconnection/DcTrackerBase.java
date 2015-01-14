@@ -534,6 +534,9 @@ public abstract class DcTrackerBase extends Handler {
                 }
                 DcAsyncChannel dcac = apnContext.getDcAc();
                 if (dcac != null) {
+                    if (DBG) {
+                        log("onActionIntentReconnectAlarm: tearDown apnContext=" + apnContext);
+                    }
                     dcac.tearDown(apnContext, "", null);
                 }
                 apnContext.setDataConnectionAc(null);
