@@ -413,8 +413,7 @@ public class SubscriptionController extends ISub.Stub {
             return "";
         }
         // FIXME: have a better way to get country code instead of reading from system property
-        return TelephonyManager.getTelephonyProperty(
-                phoneId, TelephonyProperties.PROPERTY_ICC_OPERATOR_ISO_COUNTRY, "");
+        return mTelephonyManager.getSimCountryIsoForPhone(phoneId);
     }
 
     /**
