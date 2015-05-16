@@ -502,10 +502,10 @@ public class RIL extends BaseCommands implements CommandsInterface {
         return messageLength;
     }
 
-    class RILReceiver implements Runnable {
+    protected class RILReceiver implements Runnable {
         byte[] buffer;
 
-        RILReceiver() {
+        protected RILReceiver() {
             buffer = new byte[RIL_MAX_COMMAND_BYTES];
         }
 
@@ -677,19 +677,23 @@ public class RIL extends BaseCommands implements CommandsInterface {
         if (cm.isNetworkSupported(ConnectivityManager.TYPE_MOBILE) == false) {
             riljLog("Not starting RILReceiver: wifi-only");
         } else {
+            riljLog("Starting RILReceiver" + mInstanceId);
+            mReceiver = createRILReceiver();
+            mReceiverThread = new Thread(mReceiver, "RILReceiver" + mInstanceId);
+            mReceiverThread.start();
+
             DisplayManager dm = (DisplayManager)context.getSystemService(
                     Context.DISPLAY_SERVICE);
             mDefaultDisplay = dm.getDisplay(Display.DEFAULT_DISPLAY);
             dm.registerDisplayListener(mDisplayListener, null);
-
-            riljLog("Starting RILReceiver");
-            mReceiver = new RILReceiver();
-            mReceiverThread = new Thread(mReceiver, "RILReceiver");
-            mReceiverThread.start();
         }
 
         TelephonyDevController tdc = TelephonyDevController.getInstance();
         tdc.registerRIL(this);
+    }
+
+    protected RILReceiver createRILReceiver() {
+        return new RILReceiver();
     }
 
     //***** CommandsInterface implementation
