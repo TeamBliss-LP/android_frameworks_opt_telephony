@@ -35,17 +35,13 @@ public final class AdnRecordCache extends Handler implements IccConstants {
     //***** Instance Variables
 
     private IccFileHandler mFh;
-    private UsimPhoneBookManager mUsimPhoneBookManager, mUsimLocalPhoneBookManager,
-        mUsimGlobalPhoneBookManager;
+    private UsimPhoneBookManager mUsimPhoneBookManager;
 
     private int mAdncountofIcc = 0;
 
     // Indexed by EF ID
-    SparseArray<ArrayList<AdnRecord>> mGlobalAdnLikeFiles
+    SparseArray<ArrayList<AdnRecord>> mAdnLikeFiles
         = new SparseArray<ArrayList<AdnRecord>>();
-    SparseArray<ArrayList<AdnRecord>> mLocalAdnLikeFiles
-        = new SparseArray<ArrayList<AdnRecord>>();
-    SparseArray<ArrayList<AdnRecord>> mAdnLikeFiles = mGlobalAdnLikeFiles;
 
     // People waiting for ADN-like files to be loaded
     SparseArray<ArrayList<Message>> mAdnLikeWaiters
@@ -54,7 +50,6 @@ public final class AdnRecordCache extends Handler implements IccConstants {
     // People waiting for adn record to be updated
     SparseArray<Message> mUserWriteResponse = new SparseArray<Message>();
 
-    private boolean mUseLocalPb = false;
     //***** Event Constants
 
     static final int EVENT_LOAD_ALL_ADN_LIKE_DONE = 1;
@@ -63,21 +58,13 @@ public final class AdnRecordCache extends Handler implements IccConstants {
     // *****USIM TAG Constants
     private static final int USIM_EFANR_TAG   = 0xC4;
     private static final int USIM_EFEMAIL_TAG = 0xCA;
-
-    //Update ADN Return Codes
-    private static final int UPDATE_ADN_SUCCESS = 0;
-    private static final int UPDATE_ADN_EF_NOT_KNOWN = 1;
-    private static final int UPDATE_ADN_NO_ADN_LIST = 2;
-    private static final int UPDATE_ADN_NO_ADN_RECORD = 3;
-    private static final int UPDATE_ADN_PENDING = 4;
-
-
     //***** Constructor
+
+
+
     AdnRecordCache(IccFileHandler fh) {
         mFh = fh;
-        mUsimGlobalPhoneBookManager = new UsimPhoneBookManager(mFh, this);
-        mUsimLocalPhoneBookManager = new UsimPhoneBookManager(mFh, this);
-        mUsimPhoneBookManager = mUsimGlobalPhoneBookManager;
+        mUsimPhoneBookManager = new UsimPhoneBookManager(mFh, this);
     }
 
     //***** Called from SIMRecords
@@ -86,10 +73,8 @@ public final class AdnRecordCache extends Handler implements IccConstants {
      * Called from SIMRecords.onRadioNotAvailable and SIMRecords.handleSimRefresh.
      */
     public void reset() {
-        mGlobalAdnLikeFiles.clear();
-        mLocalAdnLikeFiles.clear();
-        mUsimGlobalPhoneBookManager.reset();
-        mUsimLocalPhoneBookManager.reset();
+        mAdnLikeFiles.clear();
+        mUsimPhoneBookManager.reset();
 
         clearWaiters();
         clearUserWriters();
@@ -173,7 +158,7 @@ public final class AdnRecordCache extends Handler implements IccConstants {
             sendErrorResponse(response, "Have pending update for EF:" + efid);
             return;
         }
-        useLocalPb(false);
+
         mUserWriteResponse.put(efid, response);
 
         new AdnRecordLoader(mFh).updateEF(adn, efid, extensionEF,
@@ -198,43 +183,17 @@ public final class AdnRecordCache extends Handler implements IccConstants {
     public void updateAdnBySearch(int efid, AdnRecord oldAdn, AdnRecord newAdn,
             String pin2, Message response) {
 
-        int result;
-        result = updateAdnBySearchOnEf(false, efid, oldAdn, newAdn, pin2, response);
-
-        if (UPDATE_ADN_SUCCESS != result && efid == EF_PBR) {
-            //Update failed on global PB, do update on local PB now.
-            result = updateAdnBySearchOnEf(true, efid, oldAdn, newAdn, pin2, response);
-        }
-
-        switch(result) {
-            case UPDATE_ADN_EF_NOT_KNOWN:
-                sendErrorResponse(response, "EF is not known ADN-like EF:" + efid);
-                break;
-            case UPDATE_ADN_NO_ADN_LIST:
-                sendErrorResponse(response, "Adn list not exist for EF:" + efid);
-                break;
-            case UPDATE_ADN_NO_ADN_RECORD:
-                sendErrorResponse(response, "Adn record don't exist for " + oldAdn);
-                break;
-            case UPDATE_ADN_PENDING:
-                sendErrorResponse(response, "Have pending update for EF:" + efid);
-                break;
-        }
-
-    }
-
-    private int updateAdnBySearchOnEf(boolean useLocalPb, int efid, AdnRecord oldAdn,
-            AdnRecord newAdn, String pin2, Message response) {
-
         int extensionEF;
         extensionEF = extensionEfForEf(efid);
 
-        if (extensionEF < 0) return UPDATE_ADN_EF_NOT_KNOWN;
+        if (extensionEF < 0) {
+            sendErrorResponse(response, "EF is not known ADN-like EF:" + efid);
+            return;
+        }
 
         ArrayList<AdnRecord> oldAdnList = null;
         try {
             if (efid == EF_PBR) {
-                useLocalPb(useLocalPb);
                 oldAdnList = mUsimPhoneBookManager.loadEfFilesFromUsim();
             } else {
                 oldAdnList = getRecordsIfLoaded(efid);
@@ -247,7 +206,10 @@ public final class AdnRecordCache extends Handler implements IccConstants {
             oldAdnList = null;
         }
 
-        if (oldAdnList == null) return UPDATE_ADN_NO_ADN_LIST;
+        if (oldAdnList == null) {
+            sendErrorResponse(response, "Adn list not exist for EF:" + efid);
+            return;
+        }
 
         int index = -1;
         int count = 1;
@@ -287,11 +249,14 @@ public final class AdnRecordCache extends Handler implements IccConstants {
             count++;
         }
 
-        if (index == -1) return UPDATE_ADN_NO_ADN_RECORD;
+        Log.d("AdnRecordCache", "updateAdnBySearch, update oldADN:" + oldAdn.toString() +
+                ", newAdn:" + newAdn.toString() + ",index :" + index);
 
-        Log.d("AdnRecordCache",
-                "update oldADN:" + oldAdn.toString() + ", newAdn:" + newAdn.toString() + ",index :"
-                        + index);
+        if (index == -1) {
+            sendErrorResponse(response, "Adn record don't exist for " + oldAdn);
+            return;
+        }
+
         if (efid == EF_PBR) {
             AdnRecord foundAdn = oldAdnList.get(index-1);
             newAdn.mEfid = foundAdn.mEfid;
@@ -307,7 +272,10 @@ public final class AdnRecordCache extends Handler implements IccConstants {
 
         Message pendingResponse = mUserWriteResponse.get(efid);
 
-        if (pendingResponse != null) return UPDATE_ADN_PENDING;
+        if (pendingResponse != null) {
+            sendErrorResponse(response, "Have pending update for EF:" + efid);
+            return;
+        }
 
         if (efid == EF_PBR) {
             updateEmailAndAnr(efid, mUsimPhoneBookManager.getPBPath(efid),
@@ -318,21 +286,6 @@ public final class AdnRecordCache extends Handler implements IccConstants {
                     index, pin2,
                     obtainMessage(EVENT_UPDATE_ADN_DONE, efid, index, newAdn));
         }
-
-        return UPDATE_ADN_SUCCESS;
-    }
-
-    private void useLocalPb(boolean useLocalPb) {
-        if (mUseLocalPb == useLocalPb) {
-            //Same state, IGNORE!!!
-            return;
-        }
-        Log.d("AdnRecordCache","Using " + (useLocalPb ? "Local" : "Global") + " Phonebook");
-        mUseLocalPb = useLocalPb;
-        mFh.useLocalPb(useLocalPb);
-        mAdnLikeFiles = useLocalPb ? mLocalAdnLikeFiles : mGlobalAdnLikeFiles;
-        mUsimPhoneBookManager =
-                useLocalPb ? mUsimLocalPhoneBookManager : mUsimGlobalPhoneBookManager;
     }
 
 
@@ -346,16 +299,7 @@ public final class AdnRecordCache extends Handler implements IccConstants {
         ArrayList<AdnRecord> result;
 
         if (efid == EF_PBR) {
-            ArrayList<AdnRecord> combinedResult = new ArrayList<AdnRecord>();
-            //First Load from gloabl and then load from local PhoneBook.
-            useLocalPb(false);
             result = mUsimPhoneBookManager.loadEfFilesFromUsim();
-            combinedResult.addAll(result);
-            useLocalPb(true);
-            result = mUsimPhoneBookManager.loadEfFilesFromUsim();
-            combinedResult.addAll(result);
-
-            result = combinedResult;
         } else {
             result = getRecordsIfLoaded(efid);
         }
@@ -595,7 +539,6 @@ public final class AdnRecordCache extends Handler implements IccConstants {
             sendErrorResponse(response, "EF is not known ADN-like EF:" + efid);
             return;
         }
-        useLocalPb(false);
 
         ArrayList<AdnRecord> oldAdnList = null;
         try {
@@ -644,22 +587,18 @@ public final class AdnRecordCache extends Handler implements IccConstants {
     }
 
     public int getAnrCount() {
-        return mUsimGlobalPhoneBookManager.getAnrCount() +
-                mUsimLocalPhoneBookManager.getAnrCount();
+        return mUsimPhoneBookManager.getAnrCount();
     }
 
     public int getEmailCount() {
-        return mUsimGlobalPhoneBookManager.getEmailCount() +
-                mUsimLocalPhoneBookManager.getEmailCount();
+        return mUsimPhoneBookManager.getEmailCount();
     }
     public int getSpareAnrCount() {
-        return mUsimGlobalPhoneBookManager.getSpareAnrCount() +
-                mUsimLocalPhoneBookManager.getSpareAnrCount();
+        return mUsimPhoneBookManager.getSpareAnrCount();
     }
 
     public int getSpareEmailCount() {
-        return mUsimGlobalPhoneBookManager.getSpareEmailCount() +
-                mUsimLocalPhoneBookManager.getSpareEmailCount();
+        return mUsimPhoneBookManager.getSpareEmailCount();
     }
 
     public int getAdnCount() {
@@ -671,7 +610,6 @@ public final class AdnRecordCache extends Handler implements IccConstants {
     }
 
     public int getUsimAdnCount() {
-        return mUsimGlobalPhoneBookManager.getUsimAdnCount() +
-                mUsimLocalPhoneBookManager.getUsimAdnCount();
+        return mUsimPhoneBookManager.getUsimAdnCount();
     }
 }

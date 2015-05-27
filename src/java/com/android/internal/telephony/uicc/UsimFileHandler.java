@@ -64,22 +64,15 @@ public final class UsimFileHandler extends IccFileHandler implements IccConstant
             return MF_SIM + DF_ADF;
 
         case EF_PBR:
-            if (mUseLocalPb) {
-                return MF_SIM + DF_ADF + DF_PHONEBOOK;
-            } else {
-                return MF_SIM + DF_TELECOM + DF_PHONEBOOK;
-            }
+            // we only support global phonebook.
+            return MF_SIM + DF_TELECOM + DF_PHONEBOOK;
         }
         String path = getCommonIccEFPath(efid);
         if (path == null) {
             // The EFids in USIM phone book entries are decided by the card manufacturer.
             // So if we don't match any of the cases above and if its a USIM return
             // the phone book path.
-            if (mUseLocalPb) {
-                return MF_SIM + DF_ADF + DF_PHONEBOOK;
-            } else {
-                return MF_SIM + DF_TELECOM + DF_PHONEBOOK;
-            }
+            return MF_SIM + DF_TELECOM + DF_PHONEBOOK;
         }
         return path;
     }

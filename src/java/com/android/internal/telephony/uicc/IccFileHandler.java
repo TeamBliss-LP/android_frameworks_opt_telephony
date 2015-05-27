@@ -96,7 +96,6 @@ public abstract class IccFileHandler extends Handler implements IccConstants {
     protected final CommandsInterface mCi;
     protected final UiccCardApplication mParentApp;
     protected final String mAid;
-    protected boolean mUseLocalPb = false;
 
     static class LoadLinearFixedContext {
 
@@ -745,21 +744,14 @@ public abstract class IccFileHandler extends Handler implements IccConstants {
         case EF_PL:
             return MF_SIM;
         case EF_PBR:
-            if (mUseLocalPb) {
-                return MF_SIM + DF_ADF + DF_PHONEBOOK;
-            } else {
-                return MF_SIM + DF_TELECOM + DF_PHONEBOOK;
-            }
+            // we only support global phonebook.
+            return MF_SIM + DF_TELECOM + DF_PHONEBOOK;
         case EF_IMG:
             return MF_SIM + DF_TELECOM + DF_GRAPHICS;
         }
         return null;
     }
 
-    public void useLocalPb (boolean useLocalPb) {
-        logd("Using " + (useLocalPb ? "Local": "Global") + " Phonebook");
-        mUseLocalPb = useLocalPb;
-    }
     protected abstract String getEFPath(int efid);
     protected abstract void logd(String s);
 
