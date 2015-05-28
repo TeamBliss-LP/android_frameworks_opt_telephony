@@ -38,6 +38,7 @@ import android.os.UserHandle;
 import android.net.NetworkRequest;
 import android.preference.PreferenceManager;
 import android.provider.Settings.SettingNotFoundException;
+import android.telephony.SubscriptionManager;
 
 import com.android.internal.telephony.dataconnection.DctController;
 import com.android.internal.telephony.dataconnection.DdsScheduler;
@@ -431,7 +432,7 @@ public class SubscriptionController extends ISub.Stub {
         }
         ArrayList<SubscriptionInfo> subList = null;
         Cursor cursor = mContext.getContentResolver().query(SubscriptionManager.CONTENT_URI,
-                null, selection, selectionArgs, null);
+                null, selection, selectionArgs, SubscriptionManager.SIM_SLOT_INDEX);
         try {
             if (cursor != null) {
                 while (cursor.moveToNext()) {
